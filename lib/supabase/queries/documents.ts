@@ -10,5 +10,6 @@ export async function getDocuments(clientId: string): Promise<ClientDocument[]> 
     .eq("client_id", clientId)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map(mapDocument);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map(mapDocument);
 }

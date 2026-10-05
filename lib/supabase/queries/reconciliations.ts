@@ -17,7 +17,7 @@ async function getLatestCompleteReconciliation(clientId: string) {
     .order("run_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return data;
+  return data as unknown as { id: string; period: string } | null;
 }
 
 const RESULT_TYPES: ReconResultType[] = [

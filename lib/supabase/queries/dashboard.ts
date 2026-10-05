@@ -36,10 +36,12 @@ export async function getPriorityExceptionGroups(): Promise<
   const top = [...byClient.entries()].sort((a, b) => b[1].value - a[1].value).slice(0, 3);
   if (top.length === 0) return [];
 
-  const { data: clients } = await supabase.from("clients").select("*").in(
+  const { data: clientsData } = await supabase.from("clients").select("*").in(
     "slug",
     top.map(([slug]) => slug)
   );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const clients = clientsData as any[] | null;
 
   const { mapClient } = await import("@/lib/supabase/mappers");
   return top

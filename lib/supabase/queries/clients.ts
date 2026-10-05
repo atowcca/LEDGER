@@ -1,23 +1,42 @@
 // Returns lib/types.ts view models — see lib/supabase/mappers.ts.
 // Function names/signatures mirror lib/mock-data.ts so pages that switch
 // their import from mock-data to here need no other changes.
+//
+// Every result here is explicitly typed rather than relying on Supabase's
+// select-string type inference — that inference has proven unreliable
+// against this project's hand-written (non-generated) database.types.ts.
 import { createClient } from "@/lib/supabase/server";
 import { mapClient } from "@/lib/supabase/mappers";
 import { fetchAllPages } from "@/lib/supabase/fetch-all";
 import type { Client } from "@/lib/types";
 
+interface ClientRow {
+  id: string;
+  slug: string;
+  name: string;
+  gstin: string;
+  engagement: string | null;
+  status: "ACTIVE" | "ONBOARDING" | "PAUSED";
+  created_at: string;
+}
+
 export async function listClients(): Promise<Client[]> {
   const supabase = createClient();
-  const { data: clients, error } = await supabase.from("clients").select("*").order("name");
+  const { data, error } = await supabase.from("clients").select("*").order("name");
   if (error) throw error;
+  const clients = data as unknown as ClientRow[] | null;
   if (!clients) return [];
 
   // documentsCount / exceptionsCount / lastActivity need small follow-up
   // aggregate queries — fine at this demo's scale (12 clients).
   const [docCounts, excCounts, lastActivity] = await Promise.all([
-    fetchAllPages((from, to) => supabase.from("documents").select("client_id").order("id").range(from, to)),
-    fetchAllPages((from, to) => supabase.from("exceptions").select("client_id").order("id").range(from, to)),
-    fetchAllPages((from, to) =>
+    fetchAllPages<{ client_id: string }>((from, to) =>
+      supabase.from("documents").select("client_id").order("id").range(from, to)
+    ),
+    fetchAllPages<{ client_id: string }>((from, to) =>
+      supabase.from("exceptions").select("client_id").order("id").range(from, to)
+    ),
+    fetchAllPages<{ client_id: string; created_at: string }>((from, to) =>
       supabase
         .from("activity_log")
         .select("client_id, created_at")
@@ -49,8 +68,9 @@ export async function listClients(): Promise<Client[]> {
 
 export async function getClient(slug: string): Promise<Client | undefined> {
   const supabase = createClient();
-  const { data: row, error } = await supabase.from("clients").select("*").eq("slug", slug).maybeSingle();
+  const { data, error } = await supabase.from("clients").select("*").eq("slug", slug).maybeSingle();
   if (error) throw error;
+  const row = data as unknown as ClientRow | null;
   if (!row) return undefined;
 
   const [{ count: documentsCount }, { count: exceptionsCount }] = await Promise.all([
@@ -69,7 +89,7 @@ export async function getClient(slug: string): Promise<Client | undefined> {
 export async function getClientDbId(slug: string): Promise<string | undefined> {
   const supabase = createClient();
   const { data } = await supabase.from("clients").select("id").eq("slug", slug).maybeSingle();
-  return data?.id;
+  return (data as unknown as { id: string } | null)?.id;
 }
 
 function countBy<T extends Record<string, unknown>>(rows: T[] | null, key: keyof T) {

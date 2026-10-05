@@ -17,14 +17,15 @@ export async function completeSignupAction(params: {
 }) {
   const admin = createServiceRoleClient();
 
-  const { data: firm, error: firmError } = await admin
-    .from("firms")
+  const { data: firmData, error: firmError } = await (admin
+    .from("firms") as any)
     .insert({ name: params.firmName })
     .select("id")
     .single();
   if (firmError) throw new Error(firmError.message);
+  const firm = firmData as unknown as { id: string };
 
-  const { error: userError } = await admin.from("users").insert({
+  const { error: userError } = await (admin.from("users") as any).insert({
     firm_id: firm.id,
     auth_user_id: params.authUserId,
     name: params.name,

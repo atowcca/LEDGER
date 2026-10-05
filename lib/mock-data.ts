@@ -10,6 +10,7 @@ import type {
   ClientDocument,
   ReconciliationRow,
   ReconciliationSummary,
+  ReconResultType,
   ExceptionRecord,
   ActivityEvent,
   TaskRecord,

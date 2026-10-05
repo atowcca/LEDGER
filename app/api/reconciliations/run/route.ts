@@ -31,7 +31,7 @@ async function insertInChunks<T extends Record<string, unknown>>(
 ): Promise<string | null> {
   for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await supabase.from(table).insert(rows.slice(i, i + INSERT_CHUNK) as any);
+    const { error } = await (supabase.from(table) as any).insert(rows.slice(i, i + INSERT_CHUNK) as any);
     if (error) return error.message;
   }
   return null;
@@ -54,22 +54,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const { data: me } = await supabase
+  const { data: meData } = await supabase
     .from("users")
     .select("firm_id")
     .eq("auth_user_id", user.id)
     .maybeSingle();
+  const me = meData as unknown as { firm_id: string } | null;
   if (!me) {
     return NextResponse.json({ error: "No matching users row for this session." }, { status: 403 });
   }
 
   const reconciliationId = randomUUID();
   const fail = async (message: string) => {
-    await supabase.from("reconciliations").update({ status: "FAILED" }).eq("id", reconciliationId);
+    await (supabase.from("reconciliations") as any).update({ status: "FAILED" }).eq("id", reconciliationId);
     return NextResponse.json({ error: message }, { status: 500 });
   };
 
-  await supabase.from("reconciliations").insert({
+  await (supabase.from("reconciliations") as any).insert({
     id: reconciliationId,
     firm_id: me.firm_id,
     client_id: clientId,
@@ -80,18 +81,32 @@ export async function POST(request: NextRequest) {
     status: "RUNNING",
   });
 
-  let transactions;
-  let existingExceptionRows;
-  let codeRows;
+  interface TransactionRow {
+    id: string;
+    source: string;
+    vendor_name: string;
+    vendor_gstin: string;
+    invoice_number: string;
+    invoice_date: string;
+    taxable_value: number;
+    cgst: number;
+    sgst: number;
+    igst: number;
+    total_amount: number;
+  }
+
+  let transactions: TransactionRow[];
+  let existingExceptionRows: { transaction_id: string | null }[];
+  let codeRows: { display_code: string }[];
   try {
     [transactions, existingExceptionRows, codeRows] = await Promise.all([
-      fetchAllPages((from, to) =>
+      fetchAllPages<TransactionRow>((from, to) =>
         supabase.from("transactions").select("*").eq("client_id", clientId).order("id").range(from, to)
       ),
-      fetchAllPages((from, to) =>
+      fetchAllPages<{ transaction_id: string | null }>((from, to) =>
         supabase.from("exceptions").select("transaction_id").eq("client_id", clientId).order("id").range(from, to)
       ),
-      fetchAllPages((from, to) =>
+      fetchAllPages<{ display_code: string }>((from, to) =>
         supabase.from("exceptions").select("display_code").eq("firm_id", me.firm_id).order("id").range(from, to)
       ),
     ]);
@@ -99,7 +114,7 @@ export async function POST(request: NextRequest) {
     return fail((err as Error).message);
   }
 
-  const toEngineTxn = (t: (typeof transactions)[number]): ReconciliationTransaction => ({
+  const toEngineTxn = (t: TransactionRow): ReconciliationTransaction => ({
     id: t.id,
     vendorName: t.vendor_name,
     vendorGstin: t.vendor_gstin,
@@ -168,8 +183,8 @@ export async function POST(request: NextRequest) {
   const exceptionsError = await insertInChunks(supabase, "exceptions", exceptionRows);
   if (exceptionsError) return fail(exceptionsError);
 
-  await supabase
-    .from("reconciliations")
+  await (supabase
+    .from("reconciliations") as any)
     .update({ status: "COMPLETE", run_at: new Date().toISOString() })
     .eq("id", reconciliationId);
 

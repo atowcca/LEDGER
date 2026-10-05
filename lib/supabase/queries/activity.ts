@@ -10,7 +10,8 @@ export async function getActivity(clientId: string): Promise<ActivityEvent[]> {
     .eq("client_id", clientId)
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map(mapActivity);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map(mapActivity);
 }
 
 /** Logs an activity row — called after exception mutations (see app/actions/exceptions.ts). */
@@ -23,7 +24,7 @@ export async function logActivity(params: {
   description: string;
 }) {
   const supabase = createClient();
-  const { error } = await supabase.from("activity_log").insert({
+  const { error } = await (supabase.from("activity_log") as any).insert({
     firm_id: params.firmId,
     client_id: params.clientId,
     exception_id: params.exceptionId ?? null,

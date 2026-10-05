@@ -31,6 +31,7 @@ export interface Database {
         Row: { id: string; name: string; created_at: string };
         Insert: { id?: string; name: string; created_at?: string };
         Update: Partial<{ name: string }>;
+        Relationships: [];
       };
       users: {
         Row: {
@@ -52,6 +53,7 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<{ name: string; email: string; role: UserRole; auth_user_id: string | null }>;
+        Relationships: [];
       };
       clients: {
         Row: {
@@ -87,6 +89,7 @@ export interface Database {
           engagement: string | null;
           status: ClientStatus;
         }>;
+        Relationships: [];
       };
       documents: {
         Row: {
@@ -120,6 +123,7 @@ export interface Database {
           extracted_data: Record<string, unknown> | null;
           extracted_confidence: number | null;
         }>;
+        Relationships: [];
       };
       transactions: {
         Row: {
@@ -144,6 +148,7 @@ export interface Database {
           "id" | "created_at"
         > & { id?: string; created_at?: string };
         Update: Partial<Database["public"]["Tables"]["transactions"]["Row"]>;
+        Relationships: [];
       };
       reconciliations: {
         Row: {
@@ -163,6 +168,7 @@ export interface Database {
           "id" | "created_at"
         > & { id?: string; created_at?: string };
         Update: Partial<{ status: ReconciliationStatus; run_at: string | null }>;
+        Relationships: [];
       };
       reconciliation_results: {
         Row: {
@@ -181,6 +187,7 @@ export interface Database {
           "id" | "created_at"
         > & { id?: string; created_at?: string };
         Update: Partial<Database["public"]["Tables"]["reconciliation_results"]["Row"]>;
+        Relationships: [];
       };
       exceptions: {
         Row: {
@@ -211,6 +218,7 @@ export interface Database {
           resolved_at: string | null;
           severity: ExceptionSeverity;
         }>;
+        Relationships: [];
       };
       tasks: {
         Row: {
@@ -230,6 +238,7 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<{ status: ExceptionStatus; assigned_to: string; due_date: string | null }>;
+        Relationships: [];
       };
       evidence: {
         Row: {
@@ -249,6 +258,7 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<{ status: EvidenceStatus; document_id: string | null }>;
+        Relationships: [];
       };
       activity_log: {
         Row: {
@@ -266,7 +276,27 @@ export interface Database {
           created_at?: string;
         };
         Update: never;
+        Relationships: [];
       };
     };
+    // Supabase's query client needs these keys to exist — even empty — to
+    // correctly infer what .select("col1, col2") returns. Omitting them
+    // (as this hand-written file originally did) makes every such query
+    // resolve to `never`, which is the exact "Failed to compile" error this
+    // fixes. Real `supabase gen types` output always includes these.
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: {
+      user_role: UserRole;
+      client_status: ClientStatus;
+      document_type: DocumentType;
+      processing_status: ProcessingStatus;
+      reconciliation_status: ReconciliationStatus;
+      recon_result_type: ReconResultType;
+      exception_severity: ExceptionSeverity;
+      exception_status: ExceptionStatus;
+      evidence_status: EvidenceStatus;
+    };
+    CompositeTypes: Record<string, never>;
   };
 }

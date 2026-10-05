@@ -78,15 +78,16 @@ export async function listExceptionsForReview(): Promise<ExceptionRecord[]> {
 
 export async function assignException(displayCode: string, userId: string) {
   const supabase = createClient();
-  const { data: exception } = await supabase
+  const { data } = await supabase
     .from("exceptions")
     .select("id, status")
     .eq("display_code", displayCode)
     .maybeSingle();
+  const exception = data as unknown as { id: string; status: ExceptionStatus } | null;
   if (!exception) throw new Error("Exception not found");
 
-  const { error } = await supabase
-    .from("exceptions")
+  const { error } = await (supabase
+    .from("exceptions") as any)
     .update({
       assigned_to: userId,
       status: exception.status === "OPEN" ? "ASSIGNED" : exception.status,
@@ -97,8 +98,8 @@ export async function assignException(displayCode: string, userId: string) {
 
 export async function updateExceptionStatus(displayCode: string, status: ExceptionStatus) {
   const supabase = createClient();
-  const { error } = await supabase
-    .from("exceptions")
+  const { error } = await (supabase
+    .from("exceptions") as any)
     .update({
       status,
       resolved_at: status === "RESOLVED" ? new Date().toISOString() : null,

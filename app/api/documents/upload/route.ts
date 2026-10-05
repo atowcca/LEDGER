@@ -37,11 +37,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const { data: me } = await supabase
+  const { data: meData } = await supabase
     .from("users")
     .select("id, firm_id")
     .eq("auth_user_id", user.id)
     .maybeSingle();
+  const me = meData as unknown as { id: string; firm_id: string } | null;
   if (!me) {
     return NextResponse.json({ error: "No matching users row for this session." }, { status: 403 });
   }
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
 
   await uploadDocumentFile({ storagePath, fileBuffer, contentType: file.type });
 
-  const { error: insertError } = await admin.from("documents").insert({
+  const { error: insertError } = await (admin.from("documents") as any).insert({
     id: documentId,
     firm_id: me.firm_id,
     client_id: clientId,
@@ -89,8 +90,8 @@ export async function POST(request: NextRequest) {
   // statements / registers / GSTR-2B exports are parsed differently
   // (Batch 4's reconciliation engine reads those directly).
   if (documentType !== "GST Invoice") {
-    await admin
-      .from("documents")
+    await (admin
+      .from("documents") as any)
       .update({ processing_status: "Ready" })
       .eq("id", documentId);
     return NextResponse.json({ documentId, processingStatus: "Ready" });
@@ -100,11 +101,11 @@ export async function POST(request: NextRequest) {
     const extraction = await extractInvoiceData(fileBuffer, file.type);
     const confidence = averageConfidence(extraction);
 
-    await admin
-      .from("documents")
+    await (admin
+      .from("documents") as any)
       .update({
         processing_status: "Processed",
-        extracted_data: extraction,
+        extracted_data: extraction as unknown as Record<string, unknown>,
         extracted_confidence: confidence,
       })
       .eq("id", documentId);
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
       confidence,
     });
   } catch (err) {
-    await admin.from("documents").update({ processing_status: "Failed" }).eq("id", documentId);
+    await (admin.from("documents") as any).update({ processing_status: "Failed" }).eq("id", documentId);
     return NextResponse.json(
       { documentId, processingStatus: "Failed", error: (err as Error).message },
       { status: 502 }

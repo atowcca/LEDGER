@@ -1,6 +1,6 @@
 # CA Ledger — Build Status
 
-Last updated: 2026-09-27 (Scale bugs found and fixed after loading the 2,500-row seed)
+Last updated: 2026-10-01 (Vercel build: 5 rounds of type errors found and fixed — not yet re-verified)
 
 ## Fully working, live-tested against a real Supabase project
 Everything from Batches 1–4 and the frontend↔Supabase integration is confirmed working — not
@@ -9,7 +9,24 @@ review screenshots with hand-checked numbers matching the seed data exactly. One
 found and fixed in this process: an unescaped apostrophe in a generated SQL string (`vendor's`)
 that broke migration `0003`. Fixed at the generator level, not hand-patched.
 
-## Latest: scale bugs found by live testing (fixed)
+## Latest: Vercel build failure — hand-written Supabase types caused `never`-typed query results
+`next build` (which neither `npm run dev` nor `npm test` exercises) failed with "Property 'firm_id'
+does not exist on type 'never'". Root cause: `database.types.ts` was missing structural pieces
+Supabase's client needs (`Relationships` per table, `Views`/`Functions`/`Enums`/`CompositeTypes` on
+the schema) for `.select()` to infer correctly. Fixed the structural gap AND added an explicit
+backstop type to all 23 non-wildcard `.select()` calls project-wide, since the structural diagnosis
+couldn't be verified with a real compiler in this sandbox. The `.select()` fix (round 1) worked and the build progressed further, but hit the identical
+`never`-type problem on `.update()`/`.insert()` (round 2), plus one unrelated cast needed for a
+JSON column (round 3, same build). All 18 write calls across the codebase now force-cast their
+query builder to `any` rather than relying on Supabase's inference at all. Round 4: the unused `lib/mock-data.ts` reference file (dead since the Supabase integration) had
+its own unrelated bug and was still being type-checked by `next build` despite nothing importing
+it. Fixed its missing import and excluded it from `tsconfig.json` so unused files can't block a
+build again. Round 5: an implicit-`any` parameter in the standard `@supabase/ssr` cookie-handling boilerplate
+(present in both `lib/supabase/server.ts` and `middleware.ts`), unrelated to the Database-typing
+issue — fixed with the library's own exported `CookieOptions` type. **Not yet re-verified** —
+needs `npm run build` locally, then push + redeploy.
+
+## Previous: scale bugs found by live testing (fixed)
 Loading `0005` exposed the PostgREST 1,000-row cap: the reconciliation panel showed 1,000 entries
 and 6 exceptions instead of 2,500 and 173. Fixed with COUNT-based summaries, a server-side
 paginated reconciliation table, and paged reads elsewhere. The "Run reconciliation" route had the

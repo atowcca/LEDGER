@@ -7,7 +7,14 @@ import { markNextEvidenceReceived } from "@/lib/supabase/queries/evidence";
 import { logActivity } from "@/lib/supabase/queries/activity";
 import type { ExceptionStatus } from "@/lib/types";
 
-async function currentActor() {
+interface Actor {
+  id: string;
+  firm_id: string;
+  name: string;
+  role: "PARTNER" | "SENIOR" | "STAFF";
+}
+
+async function currentActor(): Promise<Actor> {
   const supabase = createClient();
   const {
     data: { user },
@@ -19,17 +26,26 @@ async function currentActor() {
     .eq("auth_user_id", user.id)
     .maybeSingle();
   if (!me) throw new Error("No matching users row for this session.");
-  return me;
+  // Explicit type, not inferred from the select string — Supabase's type
+  // inference for hand-written (non-generated) Database types has proven
+  // unreliable here, so this doesn't depend on it being fixed correctly.
+  return me as unknown as Actor;
 }
 
-async function getExceptionContext(displayCode: string) {
+interface ExceptionContext {
+  id: string;
+  client_id: string;
+  client: { slug: string } | null;
+}
+
+async function getExceptionContext(displayCode: string): Promise<ExceptionContext | null> {
   const supabase = createClient();
   const { data } = await supabase
     .from("exceptions")
     .select("id, client_id, client:clients(slug)")
     .eq("display_code", displayCode)
     .maybeSingle();
-  return data;
+  return data as unknown as ExceptionContext | null;
 }
 
 function revalidateException(clientSlug: string, displayCode: string) {
@@ -56,8 +72,7 @@ export async function assignExceptionAction(displayCode: string, userId: string,
     description: `Exception ${displayCode} assigned to ${userName}`,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  revalidateException((ctx.client as any)?.slug, displayCode);
+  revalidateException(ctx.client?.slug ?? "", displayCode);
 }
 
 export async function updateStatusAction(displayCode: string, status: ExceptionStatus) {
@@ -75,8 +90,7 @@ export async function updateStatusAction(displayCode: string, status: ExceptionS
     description: `Exception ${displayCode} marked ${status.replace(/_/g, " ").toLowerCase()}`,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  revalidateException((ctx.client as any)?.slug, displayCode);
+  revalidateException(ctx.client?.slug ?? "", displayCode);
 }
 
 // Approve/Return are partner-only (spec section 8.1/33: partners sign off on
@@ -106,8 +120,7 @@ export async function approveExceptionAction(displayCode: string) {
     description: `Exception ${displayCode} approved by ${actor.name}`,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  revalidateException((ctx.client as any)?.slug, displayCode);
+  revalidateException(ctx.client?.slug ?? "", displayCode);
 }
 
 export async function returnForReviewAction(displayCode: string, nextStatus: "OPEN" | "ASSIGNED") {
@@ -125,8 +138,7 @@ export async function returnForReviewAction(displayCode: string, nextStatus: "OP
     description: `Exception ${displayCode} returned for further work by ${actor.name}`,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  revalidateException((ctx.client as any)?.slug, displayCode);
+  revalidateException(ctx.client?.slug ?? "", displayCode);
 }
 
 export async function uploadEvidenceAction(displayCode: string) {
@@ -144,8 +156,7 @@ export async function uploadEvidenceAction(displayCode: string) {
     description: `Evidence attached for exception ${displayCode}`,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  revalidateException((ctx.client as any)?.slug, displayCode);
+  revalidateException(ctx.client?.slug ?? "", displayCode);
 }
 
 export async function sendClarificationAction(displayCode: string) {
@@ -163,6 +174,5 @@ export async function sendClarificationAction(displayCode: string) {
     description: `Client clarification requested for exception ${displayCode}`,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  revalidateException((ctx.client as any)?.slug, displayCode);
+  revalidateException(ctx.client?.slug ?? "", displayCode);
 }

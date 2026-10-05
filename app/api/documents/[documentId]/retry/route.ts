@@ -19,23 +19,24 @@ export async function POST(
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const { data: doc } = await supabase
+  const { data: docData } = await supabase
     .from("documents")
     .select("*")
     .eq("id", params.documentId)
     .maybeSingle();
+  const doc = docData as unknown as { id: string; storage_path: string } | null;
   if (!doc) {
     return NextResponse.json({ error: "Document not found." }, { status: 404 });
   }
 
   const admin = createServiceRoleClient();
-  await admin.from("documents").update({ processing_status: "Processing" }).eq("id", doc.id);
+  await (admin.from("documents") as any).update({ processing_status: "Processing" }).eq("id", doc.id);
 
   const { data: file, error: downloadError } = await admin.storage
     .from(DOCUMENTS_BUCKET)
     .download(doc.storage_path);
   if (downloadError || !file) {
-    await admin.from("documents").update({ processing_status: "Failed" }).eq("id", doc.id);
+    await (admin.from("documents") as any).update({ processing_status: "Failed" }).eq("id", doc.id);
     return NextResponse.json({ error: "Could not re-read the stored file." }, { status: 500 });
   }
 
@@ -44,18 +45,18 @@ export async function POST(
     const extraction = await extractInvoiceData(fileBuffer, file.type);
     const confidence = averageConfidence(extraction);
 
-    await admin
-      .from("documents")
+    await (admin
+      .from("documents") as any)
       .update({
         processing_status: "Processed",
-        extracted_data: extraction,
+        extracted_data: extraction as unknown as Record<string, unknown>,
         extracted_confidence: confidence,
       })
       .eq("id", doc.id);
 
     return NextResponse.json({ processingStatus: "Processed", extraction, confidence });
   } catch (err) {
-    await admin.from("documents").update({ processing_status: "Failed" }).eq("id", doc.id);
+    await (admin.from("documents") as any).update({ processing_status: "Failed" }).eq("id", doc.id);
     return NextResponse.json(
       { processingStatus: "Failed", error: (err as Error).message },
       { status: 502 }

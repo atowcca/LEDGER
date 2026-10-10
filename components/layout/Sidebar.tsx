@@ -10,7 +10,12 @@ export async function Sidebar() {
   const items = [
     { label: "Dashboard", href: "/" },
     { label: "Clients", href: "/clients" },
-    ...(user?.role === "PARTNER" ? [{ label: "Review", href: "/review" }] : []),
+    ...(user?.role === "PARTNER"
+      ? [
+          { label: "Review", href: "/review" },
+          { label: "Team", href: "/team" },
+        ]
+      : []),
   ];
 
   return (

@@ -29,11 +29,18 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Clicking the emailed reset link creates a temporary "recovery" session,
+  // which getUser() sees as a normal signed-in user — so this page must be
+  // reachable regardless of auth state, unlike the other auth pages below
+  // (which redirect an already-signed-in visitor straight to the dashboard).
+  const isResetPasswordPage = request.nextUrl.pathname.startsWith("/reset-password");
   const isPublicAuthPage =
-    request.nextUrl.pathname.startsWith("/login") || request.nextUrl.pathname.startsWith("/signup");
+    request.nextUrl.pathname.startsWith("/login") ||
+    request.nextUrl.pathname.startsWith("/signup") ||
+    request.nextUrl.pathname.startsWith("/forgot-password");
   const isApiRoute = request.nextUrl.pathname.startsWith("/api");
 
-  if (!user && !isPublicAuthPage && !isApiRoute) {
+  if (!user && !isPublicAuthPage && !isResetPasswordPage && !isApiRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

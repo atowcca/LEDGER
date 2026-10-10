@@ -273,3 +273,36 @@ pattern (used in `lib/supabase/server.ts` and `middleware.ts`), which left `setA
 without an inferred type under this project's `strict: true` / `noImplicitAny` tsconfig. Fixed by
 explicitly typing it with `CookieOptions` imported from `@supabase/ssr` itself — the type the
 library's own `createServerClient` cookie adapter expects, not a guessed shape.
+
+## Invite flow and password reset (closing the last 2 feature gaps)
+
+- **Invite flow**: Partners can invite a teammate to their *existing* firm from a new Team page
+  (`/team`, Partner-only like Review). Generates a random token stored in a new `invites` table
+  (migration `0008`), valid 7 days, with a role (Staff/Senior/Partner) attached. No email sending
+  — the partner copies the link and shares it themselves, per spec section 53's "avoid building
+  infrastructure this MVP doesn't need." The invitee visits `/signup?invite=<token>`, which shows
+  "You're invited to join <firm>" instead of the new-firm form, and on submit attaches them to the
+  *existing* firm with the invited role rather than creating a new one. The public preview
+  (`/api/invites/[token]`) only ever returns the firm name and role — never anything else — and
+  acceptance re-validates the invite server-side (not expired, not already used) rather than
+  trusting whatever the client last saw.
+- **Password reset**: standard Supabase Auth flow — `/forgot-password` requests a reset email
+  (and always shows the same confirmation regardless of whether the email exists, so this screen
+  can't be used to probe which emails have accounts), `/reset-password` handles the emailed link.
+  One subtlety that would have silently broken this: clicking the reset link creates a temporary
+  Supabase "recovery" session, which looks identical to a normal signed-in session to
+  `middleware.ts`'s auth check — so `/reset-password` had to be explicitly excluded from the
+  "redirect signed-in visitors away from auth pages" rule that `/login`/`/signup` use, or the
+  middleware would have bounced people away before they could ever set a new password.
+- **On "remember my password"**: deliberately did not store any literal password anywhere,
+  including conversation memory — that's a hard line regardless of how it's asked. Supabase's
+  browser client already persists sessions across visits by default, which is most likely what
+  was actually wanted; no explicit "Remember me" toggle was built since nothing indicated the
+  default behavior wasn't sufficient.
+
+### Build fix: `useSearchParams()` needs a Suspense boundary
+Adding `?invite=` handling to `/signup` made it read the URL query string via `useSearchParams()`,
+which opts a page out of static prerendering and makes `next build` fail unless that call sits inside
+a `<Suspense>` boundary. The form is now a `SignupForm` component wrapped by the default export.
+(`ReconTable` also uses `useSearchParams` but is only rendered by a page that reads `searchParams`
+itself, so it's always rendered per-request and never hits this.)

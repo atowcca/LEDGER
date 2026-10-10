@@ -1,6 +1,6 @@
 # CA Ledger — Build Status
 
-Last updated: 2026-10-01 (Vercel build: 5 rounds of type errors found and fixed — not yet re-verified)
+Last updated: 2026-10-02 (Deployed live + invite flow + password reset added — local build passes types, Suspense fix applied, needs one more build)
 
 ## Fully working, live-tested against a real Supabase project
 Everything from Batches 1–4 and the frontend↔Supabase integration is confirmed working — not
@@ -9,7 +9,19 @@ review screenshots with hand-checked numbers matching the seed data exactly. One
 found and fixed in this process: an unescaped apostrophe in a generated SQL string (`vendor's`)
 that broke migration `0003`. Fixed at the generator level, not hand-patched.
 
-## Latest: Vercel build failure — hand-written Supabase types caused `never`-typed query results
+## Latest: invite flow + password reset added (both feature gaps now closed)
+- Invite flow: `/team` (Partner-only) generates a 7-day token; `/signup?invite=<token>` joins the
+  invitee to the existing firm instead of creating a new one. New `invites` table (migration
+  `0008`), new `lib/supabase/queries/invites.ts`, `app/actions/invites.ts`,
+  `app/api/invites/[token]/route.ts`. See README for the full design and the RLS reasoning.
+- Password reset: `/forgot-password` + `/reset-password`, standard Supabase Auth recovery flow.
+  Required one real fix to `middleware.ts` — the recovery-session edge case documented in README.
+- Did not store the user's actual password anywhere, per explicit judgment call — see README.
+- **Not yet verified against a real build** — same discipline as every DB call since the 5 build
+  rounds: every new `.select()`/`.update()`/`.insert()` here is explicitly typed or `any`-cast,
+  but this hasn't been through `npm run build` yet. Run that before pushing.
+
+## Earlier: Vercel build failure — hand-written Supabase types caused `never`-typed query results
 `next build` (which neither `npm run dev` nor `npm test` exercises) failed with "Property 'firm_id'
 does not exist on type 'never'". Root cause: `database.types.ts` was missing structural pieces
 Supabase's client needs (`Relationships` per table, `Views`/`Functions`/`Enums`/`CompositeTypes` on

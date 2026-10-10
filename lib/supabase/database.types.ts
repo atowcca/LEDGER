@@ -278,6 +278,32 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      invites: {
+        Row: {
+          id: string;
+          firm_id: string;
+          token: string;
+          role: UserRole;
+          invited_by: string | null;
+          created_at: string;
+          expires_at: string;
+          accepted_at: string | null;
+          accepted_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          firm_id: string;
+          token: string;
+          role: UserRole;
+          invited_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+        };
+        Update: Partial<{ accepted_at: string | null; accepted_by: string | null }>;
+        Relationships: [];
+      };
     };
     // Supabase's query client needs these keys to exist — even empty — to
     // correctly infer what .select("col1, col2") returns. Omitting them
